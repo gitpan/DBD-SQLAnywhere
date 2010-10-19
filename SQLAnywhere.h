@@ -1,26 +1,43 @@
-// *****************************************************
-// Copyright (c) 2003-2008 iAnywhere Solutions, Inc.
-// Portions copyright (c) 2003-2008 Sybase, Inc.
-// All rights reserved. All unpublished rights reserved.
-// *****************************************************
+//====================================================
+//
+//      Copyright 2008-2010 iAnywhere Solutions, Inc.
+//
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+//
+//   While not a requirement of the license, if you do modify this file, we
+//   would appreciate hearing about it. Please email
+//   sqlany_interfaces@sybase.com
+//
+//====================================================
+
 #define NEED_DBIXS_VERSION 9
 
 #include <DBIXS.h>		/* installed by the DBI module	*/
 #include <stdio.h>
 
-#include "sqlca.h"
-#include "sqlda.h"
-#include "sqldef.h"
-
-/* read in our implementation details */
-
+#define _SACAPI_VERSION 2
+#include "sacapidll.h"
+#include "sacapi.h"
 #include "dbdimp.h"
+#include "sqlerr.h"
 
 #define _trace() {printf( "%s: %d\n", __FILE__, __LINE__ ); fflush( stdout );}
 
 void dbd_init _((dbistate_t *dbistate));
 
 int  dbd_db_login _((SV *dbh, imp_dbh_t *imp_dbh, char *dbname, char *uid, char *pwd));
+int  dbd_db_login6 _((SV *dbh, imp_dbh_t *imp_dbh, char *dbname, char *uid, char *pwd, SV *attr));
 int  dbd_db_commit _(( SV *dbh, imp_dbh_t *imp_dbh));
 int  dbd_db_rollback _((SV *dbh, imp_dbh_t *imp_dbh));
 int  dbd_db_disconnect _((SV *dbh, imp_dbh_t *imp_dbh));

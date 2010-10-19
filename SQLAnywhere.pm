@@ -1,16 +1,38 @@
+#====================================================
+#
+#      Copyright 2008-2010 iAnywhere Solutions, Inc.
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
+#   While not a requirement of the license, if you do modify this file, we
+#   would appreciate hearing about it. Please email
+#   sqlany_interfaces@sybase.com
+#
+#====================================================
 require 5.002;
-
-
-$DBD::SQLAnywhere::VERSION = '1.16';
-
+use strict;
+use warnings;
 {
     package DBD::SQLAnywhere;
 
     use DBI ();
     use DynaLoader ();
     use Exporter ();
-    @ISA = qw(DynaLoader Exporter);
-    %EXPORT_TAGS = (
+
+    our $VERSION = '2.04';
+    our @ISA = qw(DynaLoader Exporter);
+    our %EXPORT_TAGS = (
 	asa_types => [ qw(
 	    ASA_SMALLINT ASA_INT ASA_DECIMAL ASA_FLOAT ASA_DOUBLE ASA_DATE
 	    ASA_STRING ASA_FIXCHAR ASA_VARCHAR ASA_LONGVARCHAR ASA_TIME
@@ -26,9 +48,9 @@ $DBD::SQLAnywhere::VERSION = '1.16';
 
     bootstrap DBD::SQLAnywhere $VERSION;
 
-    $err = 0;		# holds error code   for DBI::err    (XXX SHARED!)
-    $errstr = "";	# holds error string for DBI::errstr (XXX SHARED!)
-    $drh = undef;	# holds driver handle once initialised
+    our $err = 0;		# holds error code   for DBI::err    (XXX SHARED!)
+    our $errstr = "";	# holds error string for DBI::errstr (XXX SHARED!)
+    our $drh = undef;	# holds driver handle once initialised
 
     sub CLONE {
 	$drh = undef;
@@ -50,6 +72,10 @@ $DBD::SQLAnywhere::VERSION = '1.16';
 	    'Attribution' => 'SQLAnywhere DBD by John Smirnios',
 	    });
 
+	if( !DBD::SQLAnywhere::dr::driver_init( $drh ) ) {
+	    undef( $drh );
+	}
+
 	$drh;
     }
 
@@ -61,7 +87,7 @@ $DBD::SQLAnywhere::VERSION = '1.16';
     use strict;
 
     sub connect {
-	my($drh, $dbname, $user, $auth)= @_;
+	my($drh, $dbname, $user, $auth, $attr)= @_;
 
 	# NOTE!
 	# 
@@ -110,9 +136,10 @@ $DBD::SQLAnywhere::VERSION = '1.16';
 	# Call SQLAnywhere connect func in SQLAnywhere.xs file
 	# and populate internal handle data.
 
-	DBD::SQLAnywhere::db::_login($dbh, $conn_str, 
-	                             (defined $sqlcap) ? $sqlcap : '', '')
-	    or return undef;
+	if( !DBD::SQLAnywhere::db::_login($dbh, $conn_str, 
+					  (defined $sqlcap) ? $sqlcap : '', '', $attr) ) {
+	    return undef;
+	}
 
 	$dbh;
     }
@@ -151,20 +178,17 @@ $DBD::SQLAnywhere::VERSION = '1.16';
     }
 
 
-    sub quote {
-	my($dbh, $value) = @_;
-	# we know that DBD::SQLAnywhere prepare does a describe so this will
-	# actually talk to the server and is a valid and cheap test.
-	return $value;
-    }
+# Use the DBI-provided quote routine
+#    sub quote {
+#	my($dbh, $value) = @_;
+#	return $value;
+#    }
 
 
-    sub quote_identifier {
-	my($dbh, $name) = @_;
-	# we know that DBD::SQLAnywhere prepare does a describe so this will
-	# actually talk to the server and is a valid and cheap test.
-	return "\"".$name."\"";
-    }
+#    sub quote_identifier {
+#	my($dbh, $name) = @_;
+#	return "\"".$name."\"";
+#    }
 
 
     sub table_info {
@@ -194,7 +218,7 @@ $DBD::SQLAnywhere::VERSION = '1.16';
 		      endif)
 		endif) as TABLE_TYPE,
 	    t.remarks as REMARKS
-	from SYSTABLE t, SYSUSERPERM u
+	from SYS.SYSTABLE t, SYS.SYSUSERPERM u
 	where t.creator = u.user_id
 	  and u.user_name  like ?
  	  and t.table_name like ?
@@ -356,10 +380,10 @@ $DBD::SQLAnywhere::VERSION = '1.16';
 	    NULL AS MAX_CARDINALITY,
 	    NULL AS DTD_IDENTIFIER,
 	    NULL AS IS_SELF_REF
-	    from SYSTABLE t
-	   , SYSUSERPERM u
-	   , SYSCOLUMN c
-	   , SYSDOMAIN d
+	    from SYS.SYSTABLE t
+	   , SYS.SYSUSERPERM u
+	   , SYS.SYSCOLUMN c
+	   , SYS.SYSDOMAIN d
 	where t.creator     = u.user_id
 	  and t.table_id    = c.table_id
 	  and c.domain_id   = d.domain_id
@@ -368,44 +392,9 @@ $DBD::SQLAnywhere::VERSION = '1.16';
 	  and c.column_name like ?
 	order by c.column_id
 	") or return undef;
-    $sth->bind_param(1, $schema); 
-    $sth->bind_param(2, $table); 
-    $sth->bind_param(3, $column); 
-	$sth->execute or return undef;
-	$sth;
-    }
-
-
-    sub primary_key {
-	my($dbh,$catalogue,$schema,$table,$column)       = @_;		# XXX add qualification
-
-    if ( !defined($schema) || $schema eq "" ) {
-        $schema = '%';
-    }
-
-    if ( !defined($table) || $table eq "" ) {
-        $table = '%';
-    }
-
-    if ( !defined($column) || $column eq "" ) {
-        $column = '%';
-    }
-
-	my $sth = $dbh->prepare("
-        select list(c.column_name, ', ' order by column_id)
-	from SYS.SYSTABLE t
-       , SYS.SYSUSERPERM u
-       , SYS.SYSCOLUMN c
-	where t.creator = u.user_id
-	  and t.table_id = c.table_id
-      and c.pkey = 'Y'
-      and u.user_name like ?
-      and t.table_name like ?
-      and c.column_name like ?
-	") or return undef;
-    $sth->bind_param(1, $schema); 
-    $sth->bind_param(2, $table); 
-    $sth->bind_param(3, $column); 
+	$sth->bind_param(1, $schema); 
+	$sth->bind_param(2, $table); 
+	$sth->bind_param(3, $column); 
 	$sth->execute or return undef;
 	$sth;
     }
@@ -414,17 +403,17 @@ $DBD::SQLAnywhere::VERSION = '1.16';
     sub primary_key_info {
 	my($dbh,$catalogue,$schema,$table,$column)       = @_;		# XXX add qualification
 
-    if ( !defined($schema) || $schema eq "" ) {
-        $schema = '%';
-    }
+	if ( !defined($schema) || $schema eq "" ) {
+	    $schema = '%';
+	}
 
-    if ( !defined($table) || $table eq "" ) {
-        $table = '%';
-    }
+	if ( !defined($table) || $table eq "" ) {
+	    $table = '%';
+	}
 
-    if ( !defined($column) || $column eq "" ) {
-        $column = '%';
-    }
+	if ( !defined($column) || $column eq "" ) {
+	    $column = '%';
+	}
 
 	my $sth = $dbh->prepare("
         select
@@ -448,11 +437,83 @@ $DBD::SQLAnywhere::VERSION = '1.16';
       and c.column_name like ?
     order by c.column_id
 	") or return undef;
-    $sth->bind_param(1, $schema); 
-    $sth->bind_param(2, $table); 
-    $sth->bind_param(3, $column); 
+	$sth->bind_param(1, $schema); 
+	$sth->bind_param(2, $table); 
+	$sth->bind_param(3, $column); 
 	$sth->execute or return undef;
 	$sth;
+    }
+
+    sub get_info {
+        my($dbh, $info_type) = @_;
+        require DBD::SQLAnywhere::GetInfo;
+        my $v = $DBD::SQLAnywhere::GetInfo::info{int($info_type)};
+        $v = $v->($dbh) if ref $v eq 'CODE';
+        return $v;
+    }
+
+    sub statistics_info {
+	my($dbh,$catalogue,$schema,$table,$unique_only,$quick) = @_;	# XXX add qualification
+
+	if ( !defined($schema) || $schema eq "" ) {
+	    $schema = '%';
+	}
+
+	if ( !defined($table) || $table eq "" ) {
+	    $table = '%';
+	}
+
+	if ( defined($unique_only) && $unique_only == 1 ) {
+	    $unique_only = 2;
+	}
+
+        # quick ignored for now
+	if ( !defined($quick) || $quick eq "" || $quick != 1 ) {
+	    $quick = 0;
+	}
+
+	my $sth = $dbh->prepare("
+        select
+	    NULL as TABLE_CAT,
+	    u.user_name as TABLE_SCHEM,
+	    t.table_name as TABLE_NAME,
+	    IF i.\"unique\" = '1' THEN 1 ELSE 0 ENDIF as NON_UNIQUE,
+	    t.table_name ||'.'|| i.index_name as INDEX_QUALIFIER,
+	    i.index_name as INDEX_NAME,
+	    'table' as TYPE,
+	    NULL as ORDINAL_POSITION,
+	    NULL as COLUMN_NAME,
+	    NULL as ASC_OR_DESC,
+	    NULL as CARDINALITY,
+	    NULL as PAGES,
+	    NULL as FILTER_CONDITION
+	from SYS.SYSTABLE t
+	, SYS.SYSUSERPERM u
+	, SYS.SYSIDX i
+	where t.creator  = u.user_id
+	  and t.table_id = i.table_id
+	  and u.user_name  like ?
+ 	  and t.table_name like ?
+ 	  and i.\"unique\"     like ?
+	order by u.user_name, t.table_name
+	") or return undef;
+	$sth->bind_param( 1, $schema );
+	$sth->bind_param( 2, $table );
+	$sth->bind_param( 3, $unique_only );
+#	$sth->bind_param( 4, $quick );
+	$sth->execute or return undef;
+	$sth;
+    }
+
+    sub last_insert_rowid {
+	my($dbh,$source,$col) = @_;
+
+	my $sth = $dbh->prepare("
+         select \@\@IDENTITY
+	") or return undef;
+	$sth->execute or return undef;
+        my @ida = $sth->fetchrow_array();
+        return @ida ? $ida[0] : undef;
     }
 
 

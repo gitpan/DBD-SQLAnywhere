@@ -54,17 +54,12 @@ else {
 }
 undef $sth;
 ($sth = $dbh->prepare("select * from sys_users"))
-    and print "ok 5\n"
-    or print "not ok 5\n";
-if($sth->execute) {
-    print "not ok 6\n";		# SHOULD FAIL!!!
+    and print "not ok 5\n"
+    or print "ok 5\n";
 
-    while(@dat = $sth->fetchrow) {
-	print "@dat\n";
-    }
-#    $sth->finish;
-}
-else {
+if( defined( $sth ) ) {
+    print "not ok 6\n";		# SHOULD FAIL!!!
+} else {
     print "ok 6\n";
     ($DBI::err == -141)
 	and print "ok 7\n"

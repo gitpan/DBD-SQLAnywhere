@@ -1,17 +1,31 @@
-// *****************************************************
-// Copyright (c) 2006-2008 iAnywhere Solutions, Inc.
-// Portions copyright (c) 2006-2008 Sybase, Inc.
-// All rights reserved. All unpublished rights reserved.
-// *****************************************************
+//====================================================
+//
+//      Copyright 2008-2010 iAnywhere Solutions, Inc.
+//
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+//
+//   While not a requirement of the license, if you do modify this file, we
+//   would appreciate hearing about it. Please email
+//   sqlany_interfaces@sybase.com
+//
+//====================================================
+
 /* these are (almost) random values ! */
 #define MAX_COLS 1025
 
 #define BIND_VARIABLES_INITIAL_SQLDA_SIZE 	100
 #define OUTPUT_VARIABLES_INITIAL_SQLDA_SIZE	100
-
-typedef char a_cursor_name[32];
-#define NO_CURSOR_ID	(~0UL)
-#define AVAILABLE_CURSORS_GROWTH_AMOUNT 10
 
 // SQLDA var field requires 2 bytes of length information in addition
 // to the data. We must prevent sqlvar->sqllen field from overflowing
@@ -31,29 +45,32 @@ typedef char a_cursor_name[32];
 #endif
 
 typedef char a_tempvar_name[32];
-
 typedef struct imp_fbh_st imp_fbh_t;
 
 /* Define dbh implementor data structure */
 // Note: only one thread may use a connection at one time
-struct imp_dbh_st {
-    dbih_dbc_t 		com;		/* MUST be first element in structure	*/
 
-    SQLCA		sqlca;
-    SQLCA		*sqlcap;  // needed so server-side perl can use an
-                                  // existing connection
-    // We want to reuse cursor names because dblib
-    // holds onto cursor information in case it is reopened
-    // without being redeclared
-    unsigned long	available_cursors_top;
-    unsigned long	available_cursors_size;
-    unsigned long	*available_cursors;
-    unsigned long	next_cursor_id;
-    unsigned long	next_tempvar_id;
+typedef struct SACAPI
+{
+    int				refcount;
+    SQLAnywhereInterface	api;
+    void			*context;
+} SACAPI;
+
+SACAPI *SACAPI_AddRef();
+void SACAPI_Release( SACAPI *sacapi );
+
+struct imp_dbh_st {
+    dbih_dbc_t 			com;		/* MUST be first element in structure	*/
+
+    a_sqlany_connection		*conn;
+    struct SQLCA		*ss_sqlca;	/* server-side SQLCA */
+    SACAPI			*sacapi;
 };
 
 struct imp_drh_st {
-    dbih_drc_t com;		/* MUST be first element in structure	*/
+    dbih_drc_t 			com;		/* MUST be first element in structure	*/
+    SACAPI			*sacapi;
 };
 
 struct sql_type_info {
@@ -65,22 +82,13 @@ struct sql_type_info {
 struct imp_sth_st {
     dbih_stc_t com;	    	/* MUST be first element in structure	*/
 
-    a_sql_statement_number	statement_number;
-    SQLDA			*input_sqlda;	/* Bind variables */
-    SQLDA			*output_sqlda;
-    short			*original_input_indicators;
-    struct sql_type_info	*original_output_type_info;
-    int				cursor_open;
+    a_sqlany_stmt		*statement;
     int				row_count;
-    char      			*statement;   	/* sql (see sth_scan)			*/
+    char      			*sql_statement;   	/* sql (see sth_scan)			*/
     HV        			*bind_names;
-    int        			done_prepare;   /* have we prepared this sth yet ?	*/
-    int        			done_desc;   	/* have we described this sth yet ?	*/
+    int				num_bind_params_scanned;	/* preparse found this many params */
+    int				num_bind_params;		/* the engine described this many */
     int  			long_trunc_ok;  /* is truncating a long an error	*/
-    unsigned long		cursor_id;
-    a_cursor_name		cursor_name;
-    int				has_output_params;
-    int				statement_type;
 };
 #define IMP_STH_EXECUTING	0x0001
 
@@ -104,21 +112,27 @@ typedef struct phs_st phs_t;    /* scalar placeholder   */
 
 struct phs_st {	/* scalar placeholder EXPERIMENTAL	*/
     SV			*sv;		/* the scalar holding the value		*/
-    short 		ftype;		/* external SqlAnywhere field type	*/
     unsigned short 	indp;		/* null indicator			*/
     int			is_inout;
     IV			maxlen;
-    IV			sql_type;
-    IV			in_ordinal;
-    IV			out_ordinal;
-    unsigned long	tempvar_id;
-    a_tempvar_name	tempvar_name;
+    int			sql_type;	/* the user-specified SQL (ODBC) datatype */
+    int			ordinal;	/* ordinals have origin "1", not "0" */
+    
+    // this are for storing a pointer to the bind values
+    int			in_param_is_null;
+    size_t		in_param_length;
+
+    int			out_param_is_null;
+    size_t		out_param_length;
 };
 
-void	ssa_error _((SV *h, SQLCA *sqlca, an_sql_code sqlcode, char *what));
+void ssa_error( SV *h, a_sqlany_connection *sqlca, int sqlcode, char *what );
 
 #define dbd_init		sqlanywhere_init
+#define dbd_dr_init		sqlanywhere_dr_init
+#define dbd_dr_destroy		sqlanywhere_dr_destroy
 #define dbd_db_login		sqlanywhere_db_login
+#define dbd_db_login6		sqlanywhere_db_login6
 #define dbd_db_do		sqlanywhere_db_do
 #define dbd_db_commit		sqlanywhere_db_commit
 #define dbd_db_rollback		sqlanywhere_db_rollback
@@ -138,4 +152,6 @@ void	ssa_error _((SV *h, SQLCA *sqlca, an_sql_code sqlcode, char *what));
 #define dbd_describe		sqlanywhere_describe
 #define dbd_bind_ph		sqlanywhere_bind_ph
 
+int  dbd_dr_init( SV *drh );
+int  dbd_dr_destroy( SV *drh );
 /* end */

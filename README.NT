@@ -1,7 +1,7 @@
-DBD::SQLAnywhere -- an Adaptive Server Anywhere interface for Perl 5.
+DBD::SQLAnywhere -- a SQLAnywhere interface for Perl 5.
 
    Portions Copyright (c) 1994,1995,1996            Tim Bunce
-   Portions Copyright (c) 1996-2008		    iAnywhere Solutions, Inc.
+   Portions Copyright (c) 1996-2010		    iAnywhere Solutions, Inc.
 
    For license information, please see license.txt included in this
    distribution.
@@ -14,14 +14,13 @@ DBD::SQLAnywhere -- an Adaptive Server Anywhere interface for Perl 5.
     Build, test and install the DBI module (at least DBI 1.34 is recommended).
     It is very important to test it and install it!
 
-    A SQLAnywhere client installation is *required* for building and
-    deploying.
+    A SQLAnywhere client installation is NOT required for building the module;
+    however, it is required in order to use the module.
 
     A SQLAnywhere server install is recommended for building otherwise
     the "make test" portion of the build will fail.
 
     Remember to *read* the DBI README file!
-
 
 Building:
     On UNIX:
@@ -49,7 +48,6 @@ Building:
 	    to the current directory
 	nmake test
 	nmake install
-    
 
     Do NOT hand edit the generated Makefile unless you are completely sure
     you understand the implications! Always try to make changes via the
@@ -58,7 +56,15 @@ Building:
 
 Notes:
 
-1.  SQLAnywhere connection parameters can be passed to DBD::SQLAnywhere by
+1.  As of version 2.0, DBD::SQLAnywhere can be built (but not used) without
+    SQLAnywhere installed. The current version of DBD::SQLAnywhere uses
+    a SQLAnywhere component called "dbcapi" (dbcapi.dll on NT and
+    libdbcapi.os/libdbcapi_r.so on UNIX). Dbcapi is included in the client
+    installation of SQLAnywhere 11.0.0 and later. To use the older versions
+    of SQLAnywhere with the this DBD driver, install a current EBF of SQL
+    Anywhere or download a free copy of dbcapi from www.sybase.com.
+
+2.  SQLAnywhere connection parameters can be passed to DBD::SQLAnywhere by
     placing the list of parameters after 'DBI:SQLAnywhere:' in the first
     parameter to connect(). The connection parameters are specified as a
     list of LABEL=value pairs that are delimited by semicolons.
@@ -83,9 +89,9 @@ Notes:
 	$dbh = DBI->connect( 'DBI:SQLAnywhere:ENG=demo', 'dba', 'sql' );
     
 
-2.  The SQLAnywhere DBD driver is thread-safe when using Perl ithreads.
+3.  The SQLAnywhere DBD driver is thread-safe when using Perl ithreads.
 
-3.  Prepared statements are not dropped from the SQLAnywhere server until the
+4.  Prepared statements are not dropped from the SQLAnywhere server until the
     statement handle is destroyed in the perl script. Calling finish()
     is not sufficient to drop the handle that the server is holding
     onto -- use "undef" instead or reuse the same perl variable for

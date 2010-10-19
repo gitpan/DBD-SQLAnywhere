@@ -6,7 +6,7 @@ SQLAnywhere.h
 SQLAnywhere.pm
 SQLAnywhere.xs
 dbdimp.h
-dbdimp.sqc
+dbdimp.c
 Makefile.PL
 dolink.pl
 license.txt
@@ -17,3 +17,8 @@ t/place.t
 eg/connect.pl
 eg/retrieve.pl
 eg/blobs.pl
+lib/DBD/SQLAnywhere/GetInfo.pm
+sacapidll.c
+sacapidll.h
+sacapi.h
+sqlerr.h

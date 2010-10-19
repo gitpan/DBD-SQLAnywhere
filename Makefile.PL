@@ -1,12 +1,13 @@
 # *****************************************************
-# Copyright (c) 2007-2008 iAnywhere Solutions, Inc.
-# Portions copyright (c) 2007-2008 Sybase, Inc.
+# Copyright (c) 2007-2010 iAnywhere Solutions, Inc.
+# Portions copyright (c) 2007-2010 Sybase, Inc.
 # All rights reserved. All unpublished rights reserved.
 # *****************************************************
 # Makefile.PL for SQL Anywhere DBD driver
 
 use ExtUtils::MakeMaker;
 use Getopt::Long;
+use File::Copy;
 
 require 5.004;
 
@@ -46,17 +47,20 @@ $so_ext = 'sl' if $os eq 'hpux' && $osarch =~ /^PA-RISC/;
 my %opts = (
     NAME => 'DBD::SQLAnywhere',
     VERSION_FROM => 'SQLAnywhere.pm',
-    OBJECT => 'SQLAnywhere.o dbdimp.o',
-    clean => {	FILES=> 'SQLAnywhere.xsi dbdimp.c' },
+    OBJECT => 'SQLAnywhere.o dbdimp.o sacapidll.o',
+    clean => {	FILES=> 'SQLAnywhere.xsi' },
     dist  => {	DIST_DEFAULT	=> 'clean distcheck disttest ci tardist',
 		PREOP		=> '$(MAKE) -f Makefile.old distdir',
 		COMPRESS	=> 'gzip -v9', SUFFIX => 'gz',
     },
+    PM => { 'SQLAnywhere.pm' => '$(INST_LIBDIR)/SQLAnywhere.pm',
+	    'lib/DBD/SQLAnywhere/GetInfo.pm' => 'blib/lib/DBD/SQLAnywhere/GetInfo.pm' },
 );
+
 if ($ExtUtils::MakeMaker::VERSION >= 5.43) {
     $opts{AUTHOR} = 'Tim Bunce and John Smirnios (smirnios@sybase.com)';
     $opts{ABSTRACT} = 'SQL Anywhere DBD driver';
-    $opts{PREREQ_PM} = { DBI => 0 };
+    $opts{PREREQ_PM} = { DBI => 1.34 };
     $opts{CAPI} = 'TRUE' if $Config{archname} =~ /-object\b/i;
 }
 
@@ -73,107 +77,6 @@ $::opt_g &&= '-g';	# convert to actual string
 # --- Introduction
 
 print "\nConfiguring DBD::SQLAnywhere ...\n";
-
-# --- Where is SQLAnywhere installed...
-
-my $sqlpp_platform;
-
-if( $Config{osname} eq "MSWin32" ) {
-    $sqlpp_platform = "WINNT";
-} elsif( $Config{ptrsize} == 8 ) {
-    $sqlpp_platform = "UNIX64";
-} else {
-    $sqlpp_platform = "UNIX";
-}
-
-my @install_dirs;
-
-if( defined $ENV{SADIR} ) {
-    push( @install_dirs, $ENV{SADIR} );
-}
-
-my $location;
-my $key;
-my $type;
-my $ver;
-if( $Config{osname} eq "MSWin32" ) {
-    for( $ver=$max_sqlanywhere_ver; $ver >= $min_sqlanywhere_ver; $ver-- ) {
-	if( defined $ENV{"SQLANY${ver}"} ) {
-	    push( @install_dirs, $ENV{"SQLANY${ver}"} );
-	}
-	if( $main::HKEY_CURRENT_USER->Open( "Software\\Sybase\\SQL Anywhere\\${ver}.0", $key ) ) {
-	    if( $key->QueryValueEx( 'Location', $type, $location ) ) {
-		push( @install_dirs, $location );
-	    }
-	    $key->Close();
-	}
-	if( $main::HKEY_LOCAL_MACHINE->Open( "SOFTWARE\\Sybase\\SQL Anywhere\\${ver}.0", $key ) ) {
-	    if( $key->QueryValueEx( 'Location', $type, $location ) ) {
-		push( @install_dirs, $location );
-	    }
-	    $key->Close();
-	}
-    }
-} else {
-    for( $ver=$max_sqlanywhere_ver; $ver >= $min_sqlanywhere_ver; $ver-- ) {
-	if( defined $ENV{"SQLANY${ver}"} ) {
-	    push( @install_dirs, $ENV{"SQLANY${ver}"} );
-	}
-    }
-}
-
-my $SQLAnywhere = "";
-my $sqlanywhere_version_major = "";
-my $dir;
-my $found = 0;
-
-foreach $dir ( @install_dirs ) {
-    next if $dir eq "";
-
-    if( $Config{osname} eq "MSWin32" ) {
-	if( ( -d "${dir}/win32/lib" || "${dir}/x64/lib" || "${dir}/bin${perl_bitness}/lib" ) &&
-	    -d "${dir}/h" ) {
-	    for( $ver=$max_sqlanywhere_ver; $ver >= $min_sqlanywhere_ver; $ver-- ) {
-		if( -e "${dir}/win32/dbeng${ver}.exe" ||
-		    -e "${dir}/x64/dbeng${ver}.exe" ||
-		    -e "${dir}/bin${perl_bitness}/dbeng${ver}.exe" ) {
-		    $SQLAnywhere = $dir;
-		    $sqlanywhere_version_major = $ver;
-		    $found = 1;
-		    last;
-		}
-	    }
-	}
-    } else {
-	print "searching $dir\n";
-	if( -d "${dir}/lib${perl_bitness}" &&
-	    -d "${dir}/bin${perl_bitness}" &&
-	    -d "${dir}/include" ) {
-
-	    for( $ver=$max_sqlanywhere_ver; $ver >= $min_sqlanywhere_ver; $ver-- ) {
-		if( ( -f "${dir}/bin64/sqlpp" || -f "${dir}/bin32/sqlpp" ) &&
-                    -f "${dir}/lib${perl_bitness}/libdblib${ver}${threadext}.${so_ext}" &&
-                    -f "${dir}/lib${perl_bitness}/libdbtasks${ver}${threadext}.${so_ext}" &&
-                    -f "${dir}/include/sqlca.h" &&
-                    -f "${dir}/include/sqlda.h" &&
-                    -f "${dir}/include/sqldef.h" ) {
-		    $SQLAnywhere = $dir;
-		    $sqlanywhere_version_major = $ver;
-		    $found = 1;
-		    last;
-		}
-	    }
-	}
-    }
-    last if $found;
-}
-
-if( !$found ) {
-    die "** Unable to find SQL Anywhere installation\n\n** Please set the SQLANYxx environment variable (where xx is version number).\n";
-}
-
-print "Using SQLAnywhere version ${sqlanywhere_version_major} in $SQLAnywhere\n";
-
 my $is_gcc;
 if( "$Config{cc}" eq "gcc" ||
     "$Config{gccversion}" ne "" ) {
@@ -191,44 +94,13 @@ if( $Config{osname} ne "MSWin32" ) {
 }
 $perllib =~ s/\..*//;
 
-my $sysliblist;
-my $libdir;
-$sysliblist = "";
-if( $Config{osname} eq "MSWin32" ) {
-    if( $Config{archname} =~ /-x64-/ ) {
-	if( $sqlanywhere_version_major >= 11 ) {
-	    $sysliblist .= qq( -L"$SQLAnywhere/bin64/lib" );
-	} else {
-	    $sysliblist .= qq( -L"$SQLAnywhere/x64/lib" );
-	}
-    } else {
-	if( $sqlanywhere_version_major >= 11 ) {
-	    $sysliblist .= qq( -L"$SQLAnywhere/bin32/lib" );
-	} else {
-	    $sysliblist .= qq( -L"$SQLAnywhere/win32/lib" );
-	}
-    }
-    $sysliblist .= qq( -L"$Config{archlibexp}/CORE" );
-    foreach $libdir ( split( /;/, $ENV{LIB} ) ) {
-	$sysliblist .= qq( -L"$libdir" );
-    }
-    $sysliblist .= " -ldblibtm ";
-} else {
-    $sysliblist .= "-L$SQLAnywhere/lib${perl_bitness} ";
-    $sysliblist .= "-L$Config{archlibexp}/CORE ";
-    if( $threaded ) {
-	$sysliblist .= " -ldblib${sqlanywhere_version_major}_r -ldbtasks${sqlanywhere_version_major}_r";
-    } else {
-	$sysliblist .= " -ldblib${sqlanywhere_version_major} -ldbtasks${sqlanywhere_version_major}";
-    }
-}
-
 # On UNIX platforms, leave the perllib symbols unresolved and
 # get them from the perl executable at runtime. Libperl.a is not
 # built as relocatable code so linking against it now will leave
 # relocations in a shared object which is forbidden on some
 # platforms.
-$opts{CCFLAGS} = $Config{ccflags};	
+$opts{CCFLAGS} = $Config{ccflags};
+my $sysliblist;
 if( $Config{osname} eq "MSWin32" ) {
     $sysliblist .= " -l${perllib}";
 #    $opts{CCFLAGS} =~ s/-O1//;
@@ -256,18 +128,18 @@ if( $is_gcc ) {
 }
 
 $opts{LIBS} = [ $sysliblist ];
+$opts{DEFINE} .= " -D_SACAPI_VERSION=2";
 if( $Config{osname} eq "MSWin32" ) {
-    $opts{INC}  = qq( -I"$SQLAnywhere/h" );
     $opts{INC}  .= qq( -I"$dbi_arch_dir" );
     $opts{DEFINE} .= ' -DWINNT -D_CRT_SECURE_NO_DEPRECATE';
     $opts{LD} = "\$(PERL) dolink.pl \$@";
 } else {
-    $opts{INC}  = "-I$SQLAnywhere/include ";
     $opts{INC}  .= "-I$dbi_arch_dir ";
     $opts{DEFINE} .= ' -DUNIX';
 }
-# $opts{OPTIMIZE}="-Zi";
-# $opts{dynamic_lib}{OTHERLDFLAGS} .= ' -debug';
+#$opts{OPTIMIZE}="-Zi";
+#$opts{dynamic_lib}{OTHERLDFLAGS} .= ' -debug';
+#$opts{CCFLAGS} =~ s/-Ox //;
 
 # uncomment log key platform information to help me help you quickly
 print "System: perl$] @Config{qw(myuname archname dlsrc)}\n";
@@ -278,11 +150,7 @@ WriteMakefile(%opts);
 exit 0;
 
 sub MY::postamble {
-    return( dbd_postamble(@_) .
-"
-dbdimp.c: dbdimp.sqc
-	sqlpp -r -q -n -o ${sqlpp_platform} dbdimp.sqc dbdimp.c
-" );
+    return( dbd_postamble(@_) );
 }
 
 __END__

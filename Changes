@@ -1,7 +1,31 @@
-Changes in DBD::SQLAnywhere 1.16 2nd Nov 2007, 28th Feb 2008
+Changes in DBD::SQLAnywhere 2.04 19th October 2010
+  Used refcounting for SACAPI context since DBI can free driver handles
+    before all database handles have been destroyed.
+
+Changes in DBD::SQLAnywhere 2.03 4th December 2009
+  Fixed fetching of double/floating point values
+  Updated sacapi files.
+
+Changes in DBD::SQLAnywhere 2.02 1st October 2009
+  Previous driver (version 2.01) broke support to SQLAnywhere external through Perl. This
+    has been fixed.
+
+Changes in DBD::SQLAnywhere 2.01 2nd June 2009
+  Improved threading support with SACAPI v1 and added SACAPI v2 support.
+  Removed primary_key func (to rely on the one in DBI.PM)
+  Added statistics_info (returns NULL) and last_insert_rowid
+
+Changes in DBD::SQLAnywhere 2.00 9th May 2008
+  Changed to use simplified SQLAnywhere C API (SACAPI). The driver can now be built
+    without having SQLAnywhere installed but SQLAnywhere is required to use the driver.
+  Added support for the the get_info method.
+
+Changes in DBD::SQLAnywhere 1.16 2nd Nov 2007, 28th Feb 2008, 17th March 17 2008
   (version 1.15 was not released)
   Fixed installation location & increased version number so that we can detect it
   Support new bin32/bin64 directories for SQLAnywhere 11.0 on Windows
+  Automated CPAN testing requires a successful exit from Makefile.PL if the module
+    cannot be built (due to libs not found). Go figure.
 
 Changes in DBD::SQLAnywhere 1.15 17th July 2007
   (version 1.14 was not released)
