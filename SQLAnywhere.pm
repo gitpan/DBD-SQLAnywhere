@@ -30,7 +30,7 @@ use warnings;
     use DynaLoader ();
     use Exporter ();
 
-    our $VERSION = '2.04';
+    our $VERSION = '2.05';
     our @ISA = qw(DynaLoader Exporter);
     our %EXPORT_TAGS = (
 	asa_types => [ qw(

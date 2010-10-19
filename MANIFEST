@@ -22,3 +22,4 @@ sacapidll.c
 sacapidll.h
 sacapi.h
 sqlerr.h
+META.yml

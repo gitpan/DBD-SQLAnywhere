@@ -1,3 +1,7 @@
+Changes in DBD::SQLAnywhere 2.05 19th October 2010
+  Fixed resource cleanup on failed connect
+  Added META.yml
+
 Changes in DBD::SQLAnywhere 2.04 19th October 2010
   Used refcounting for SACAPI context since DBI can free driver handles
     before all database handles have been destroyed.

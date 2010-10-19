@@ -273,9 +273,11 @@ dbd_db_login6( SV	*dbh,
     D_imp_drh_from_dbh;
     SACAPI	*sacapi = SACAPI_AddRef( imp_drh->sacapi );
 
-    imp_dbh->sacapi = sacapi;
     if( sacapi == NULL || !sacapi->api.initialized ) {
 	ssa_error( dbh, NULL, SQLE_ERROR, "SQLAnwyhere C API (dbcapi) could not be loaded." );
+	if( sacapi ) {
+	    SACAPI_Release( sacapi );
+	}
 	return( 0 );
     }
 	
@@ -293,6 +295,7 @@ dbd_db_login6( SV	*dbh,
 	}
 	if( imp_dbh->conn == NULL ) {
 	    ssa_error( dbh, NULL, SQLE_ERROR, "failed to establish server-side connection" );
+	    SACAPI_Release( sacapi );
 	    return( 0 );
 	}
     } else {
@@ -304,14 +307,18 @@ dbd_db_login6( SV	*dbh,
 	}
 	if( imp_dbh->conn == NULL ) {
 	    ssa_error( dbh, NULL, SQLE_ERROR, "failed to allocate connection" );
+	    SACAPI_Release( sacapi );
 	    return( 0 );
 	}
 	if( !sacapi->api.sqlany_connect( imp_dbh->conn, conn_str ) ) {
 	    ssa_error( dbh, imp_dbh->conn, SQLE_ERROR, "login failed" );
+	    sacapi->api.sqlany_free_connection( imp_dbh->conn );
+	    SACAPI_Release( sacapi );
 	    return( 0 );
 	}
     }
 
+    imp_dbh->sacapi = sacapi;
     DBIc_IMPSET_on( imp_dbh );	/* imp_dbh set up now			*/
     DBIc_ACTIVE_on( imp_dbh );	/* call disconnect before freeing	*/
     DBIc_LongReadLen( imp_dbh ) = DEFAULT_LONG_READ_LENGTH;

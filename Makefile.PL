@@ -58,7 +58,7 @@ my %opts = (
 );
 
 if ($ExtUtils::MakeMaker::VERSION >= 5.43) {
-    $opts{AUTHOR} = 'Tim Bunce and John Smirnios (smirnios@sybase.com)';
+    $opts{AUTHOR} = 'John Smirnios (smirnios@sybase.com), Tim Bunce';
     $opts{ABSTRACT} = 'SQL Anywhere DBD driver';
     $opts{PREREQ_PM} = { DBI => 1.34 };
     $opts{CAPI} = 'TRUE' if $Config{archname} =~ /-object\b/i;
