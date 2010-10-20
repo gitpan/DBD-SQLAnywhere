@@ -21,6 +21,8 @@
 //
 //====================================================
 
+#define PERL_NO_GET_CONTEXT
+
 #define NEED_DBIXS_VERSION 9
 
 #include <DBIXS.h>		/* installed by the DBI module	*/

@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               DBD-SQLAnywhere
-version:            2.05
+version:            2.06
 abstract:           SQL Anywhere DBD driver
 author:
     - John Smirnios (smirnios@sybase.com), Tim Bunce
@@ -11,7 +11,7 @@ configure_requires:
 build_requires:
     ExtUtils::MakeMaker:  0
 requires:
-    DBI:  1.34
+    DBI:  1.51
 no_index:
     directory:
         - t

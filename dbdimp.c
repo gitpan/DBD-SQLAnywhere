@@ -136,6 +136,7 @@ dbd_init( dbistate_t *dbistate )
 // *CAN* be called concurrently by two threads loading the driver 
 // at the same time!
 {
+    dTHX;
     DBISTATE_INIT;
 //DBIS->debug = 3;
 //DBILOGFP = PerlIO_stdout();
@@ -147,6 +148,7 @@ dbd_dr_init( SV *drh )
 // Called once when each driver object is created and locked so there
 // is no concurrent access.
 {
+    dTHX;
     D_imp_drh( drh );
 
     imp_drh->sacapi = SACAPI_Alloc();
@@ -164,6 +166,7 @@ dbd_dr_destroy( SV *drh )
 // Called once when each driver object is created and locked so there
 // is no concurrent access.
 {
+    dTHX;
     D_imp_drh( drh );
     if( DBIc_IMPSET( imp_drh ) ) {
 	if( imp_drh->sacapi != NULL ) {
@@ -179,6 +182,7 @@ dbd_discon_all( SV *drh, imp_drh_t *imp_drh )
 /*******************************************/
 {
     dTHR;
+    dTHX;
 
     /* The disconnect_all concept is flawed and needs more work */
     if( !dirty && !SvTRUE(perl_get_sv("DBI::PERL_ENDING",0)) ) {
@@ -203,8 +207,8 @@ dbd_discon_all( SV *drh, imp_drh_t *imp_drh )
 */
 
 void
-ssa_error( SV *h, a_sqlany_connection *conn, int sqlcode, char *what )
-/********************************************************************/
+ssa_error( pTHX_ SV *h, a_sqlany_connection *conn, int sqlcode, char *what )
+/**************************************************************************/
 {
     D_imp_xxh(h);
     SV *errstr = DBIc_ERRSTR(imp_xxh);
@@ -270,11 +274,12 @@ dbd_db_login6( SV	*dbh,
 /*****************************/
 {
     dTHR;
+    dTHX;
     D_imp_drh_from_dbh;
     SACAPI	*sacapi = SACAPI_AddRef( imp_drh->sacapi );
 
     if( sacapi == NULL || !sacapi->api.initialized ) {
-	ssa_error( dbh, NULL, SQLE_ERROR, "SQLAnwyhere C API (dbcapi) could not be loaded." );
+	ssa_error( aTHX_ dbh, NULL, SQLE_ERROR, "SQLAnwyhere C API (dbcapi) could not be loaded." );
 	if( sacapi ) {
 	    SACAPI_Release( sacapi );
 	}
@@ -294,7 +299,7 @@ dbd_db_login6( SV	*dbh,
 	    imp_dbh->conn = sacapi->api.sqlany_make_connection( imp_dbh->ss_sqlca );
 	}
 	if( imp_dbh->conn == NULL ) {
-	    ssa_error( dbh, NULL, SQLE_ERROR, "failed to establish server-side connection" );
+	    ssa_error( aTHX_ dbh, NULL, SQLE_ERROR, "failed to establish server-side connection" );
 	    SACAPI_Release( sacapi );
 	    return( 0 );
 	}
@@ -306,12 +311,12 @@ dbd_db_login6( SV	*dbh,
 	    imp_dbh->conn = sacapi->api.sqlany_new_connection();
 	}
 	if( imp_dbh->conn == NULL ) {
-	    ssa_error( dbh, NULL, SQLE_ERROR, "failed to allocate connection" );
+	    ssa_error( aTHX_ dbh, NULL, SQLE_ERROR, "failed to allocate connection" );
 	    SACAPI_Release( sacapi );
 	    return( 0 );
 	}
 	if( !sacapi->api.sqlany_connect( imp_dbh->conn, conn_str ) ) {
-	    ssa_error( dbh, imp_dbh->conn, SQLE_ERROR, "login failed" );
+	    ssa_error( aTHX_ dbh, imp_dbh->conn, SQLE_ERROR, "login failed" );
 	    sacapi->api.sqlany_free_connection( imp_dbh->conn );
 	    SACAPI_Release( sacapi );
 	    return( 0 );
@@ -335,7 +340,8 @@ dbd_db_commit( SV *dbh, imp_dbh_t *imp_dbh )
 {
     SACAPI *sacapi = imp_dbh->sacapi;
     if( !sacapi->api.sqlany_commit( imp_dbh->conn ) ) {
-	ssa_error( dbh, imp_dbh->conn, SQLE_ERROR, "commit failed" );
+	dTHX;
+	ssa_error( aTHX_ dbh, imp_dbh->conn, SQLE_ERROR, "commit failed" );
 	return( 0 );
     }
 
@@ -349,7 +355,8 @@ dbd_db_rollback( SV *dbh, imp_dbh_t *imp_dbh )
     SACAPI *sacapi = imp_dbh->sacapi;
 
     if( !sacapi->api.sqlany_rollback( imp_dbh->conn ) ) {
-	ssa_error( dbh, imp_dbh->conn, SQLE_ERROR, "rollback failed" );
+	dTHX;
+	ssa_error( aTHX_ dbh, imp_dbh->conn, SQLE_ERROR, "rollback failed" );
 	return( 0 );
     }
 
@@ -362,6 +369,7 @@ dbd_db_disconnect( SV *dbh, imp_dbh_t *imp_dbh )
 /**********************************************/
 {
     dTHR;
+    dTHX;
     SACAPI *sacapi = imp_dbh->sacapi;
     
     // don't close the connection if it was opened externally
@@ -374,7 +382,7 @@ dbd_db_disconnect( SV *dbh, imp_dbh_t *imp_dbh )
     DBIc_ACTIVE_off( imp_dbh );
 
     if( !sacapi->api.sqlany_disconnect( imp_dbh->conn ) ) {
-	ssa_error( dbh, imp_dbh->conn, SQLE_ERROR, "disconnect error" );
+	ssa_error( aTHX_ dbh, imp_dbh->conn, SQLE_ERROR, "disconnect error" );
 	return( 0 );
     }
 
@@ -413,6 +421,7 @@ int
 dbd_db_STORE_attrib( SV *dbh, imp_dbh_t *imp_dbh, SV *keysv, SV *valuesv )
 /************************************************************************/
 {
+    dTHX;
     STRLEN 	kl;
     char 	*key = SvPV( keysv, kl );
     SV 		*cachesv = NULL;
@@ -441,6 +450,7 @@ SV *
 dbd_db_FETCH_attrib( SV *dbh, imp_dbh_t *imp_dbh, SV *keysv )
 /***********************************************************/
 {
+    dTHX;
     STRLEN 	kl;
     char 	*key = SvPV(keysv,kl);
     SV 		*retsv = Nullsv;
@@ -481,7 +491,8 @@ dbd_st_prepare( SV *sth, imp_sth_t *imp_sth, char *statement, SV *attribs )
 //PerlIO_printf( PerlIO_stderr(), "\n\nPrepare: '%s'\n\n", _statement ); fflush(stdout);
     imp_sth->statement = sacapi->api.sqlany_prepare( imp_dbh->conn, _statement );
     if( imp_sth->statement == NULL ) {
-	ssa_error( sth, imp_dbh->conn, SQLE_ERROR, "prepare failed" ); 
+	dTHX;
+	ssa_error( aTHX_ sth, imp_dbh->conn, SQLE_ERROR, "prepare failed" ); 
 	return( 0 );
     }
     
@@ -499,6 +510,7 @@ void
 dbd_preparse( imp_sth_t *imp_sth, char *statement )
 /*************************************************/
 {
+    dTHX;
     char	quote = '\0';
     char 	*src, *start, *dest;
     phs_t 	phs_tpl;
@@ -611,6 +623,7 @@ dbd_bind_ph( SV		*sth,
 	     IV 	maxlen )
 /******************************/
 {
+    dTHX;
     D_imp_dbh_from_sth;
     SV 			**svp;
     STRLEN 		name_len;
@@ -685,15 +698,15 @@ dbd_bind_ph( SV		*sth,
 }
 
 static int
-assign_from_result_set( SV *sth, imp_sth_t *imp_sth, SV *sv, int index )
-/**********************************************************************/
+assign_from_result_set( pTHX_ SV *sth, imp_sth_t *imp_sth, SV *sv, int index )
+/****************************************************************************/
 {
     D_imp_dbh_from_sth;
     a_sqlany_data_info		dinfo;
     SACAPI			*sacapi = imp_dbh->sacapi;
 
     if( !sacapi->api.sqlany_get_data_info( imp_sth->statement, index, &dinfo ) ) {
-	ssa_error( sth, imp_dbh->conn, SQLE_ERROR, "get_data_info failed" );
+	ssa_error( aTHX_ sth, imp_dbh->conn, SQLE_ERROR, "get_data_info failed" );
 	return( FALSE );
     }
 
@@ -706,7 +719,7 @@ assign_from_result_set( SV *sth, imp_sth_t *imp_sth, SV *sv, int index )
 	
 	if( len > longreadlen ) {
 	    if( !DBIc_has( imp_sth, DBIcf_LongTruncOk ) ) {
-		ssa_error( sth, NULL, SQLE_TRUNCATED, "long value truncated" );
+		ssa_error( aTHX_ sth, NULL, SQLE_TRUNCATED, "long value truncated" );
 		return( FALSE );
 	    }
 	    len = DBIc_LongReadLen( imp_dbh );
@@ -714,7 +727,7 @@ assign_from_result_set( SV *sth, imp_sth_t *imp_sth, SV *sv, int index )
 	SvUPGRADE( sv, SVt_PV );
 	dest = SvGROW( sv, (STRLEN)len+1 );
 	if( len != 0 && sacapi->api.sqlany_get_data( imp_sth->statement, index, 0, dest, len ) < 0 ) {
-	    ssa_error( sth, imp_dbh->conn, SQLE_ERROR, "get_data failed" );
+	    ssa_error( aTHX_ sth, imp_dbh->conn, SQLE_ERROR, "get_data failed" );
 	    return( FALSE );
 	}
 	SvCUR_set( sv, len );
@@ -725,7 +738,7 @@ assign_from_result_set( SV *sth, imp_sth_t *imp_sth, SV *sv, int index )
 	char				numbuf[40];
 	if( !sacapi->api.sqlany_get_column( imp_sth->statement, index, &val ) ) {
 	    SvOK_off( sv );	// shouldn't get here
-	    ssa_error( sth, imp_dbh->conn, SQLE_ERROR, "get_column failed" );
+	    ssa_error( aTHX_ sth, imp_dbh->conn, SQLE_ERROR, "get_column failed" );
 	    return( FALSE );
 	}
 	switch(	dinfo.type ) {
@@ -768,7 +781,7 @@ assign_from_result_set( SV *sth, imp_sth_t *imp_sth, SV *sv, int index )
 		break;
 
 	    default			:
-		ssa_error( sth, imp_dbh->conn, SQLE_ERROR, "internal error: unhandled SA data type" );
+		ssa_error( aTHX_ sth, imp_dbh->conn, SQLE_ERROR, "internal error: unhandled SA data type" );
 		SvOK_off( sv );
 		return( FALSE );
 	}
@@ -782,8 +795,8 @@ assign_from_result_set( SV *sth, imp_sth_t *imp_sth, SV *sv, int index )
 }
 
 static int
-really_bind( SV *sth, imp_sth_t *imp_sth )
-/****************************************/
+really_bind( pTHX_ SV *sth, imp_sth_t *imp_sth )
+/**********************************************/
 {
     D_imp_dbh_from_sth;
     HE		*he;
@@ -804,7 +817,7 @@ really_bind( SV *sth, imp_sth_t *imp_sth )
 	    a_sqlany_bind_param		desc;
 	    a_sqlany_data_type		bind_type;
 	    if( !sacapi->api.sqlany_describe_bind_param( imp_sth->statement, phs->ordinal-1, &desc ) ) {
-		ssa_error( sth, imp_dbh->conn, SQLE_ERROR, "failed to get description for bind param" );
+		ssa_error( aTHX_ sth, imp_dbh->conn, SQLE_ERROR, "failed to get description for bind param" );
 		return( FALSE );
 	    }
 	    if( phs->sql_type == SQL_BINARY 	||
@@ -833,7 +846,7 @@ really_bind( SV *sth, imp_sth_t *imp_sth )
 		bp.value.buffer = SvGROW( phs->sv, bp.value.buffer_size+1 );
 
 		if( !sacapi->api.sqlany_bind_param( imp_sth->statement, phs->ordinal-1, &bp ) ) {
-		    ssa_error( sth, imp_dbh->conn, SQLE_ERROR, "bind for output parameter failed" );
+		    ssa_error( aTHX_ sth, imp_dbh->conn, SQLE_ERROR, "bind for output parameter failed" );
 		    return( FALSE );
 		}
 	    }
@@ -854,7 +867,7 @@ really_bind( SV *sth, imp_sth_t *imp_sth )
 		    phs->in_param_is_null = FALSE;
 		}
 		if( !sacapi->api.sqlany_bind_param( imp_sth->statement, phs->ordinal-1, &bp ) ) {
-		    ssa_error( sth, imp_dbh->conn, SQLE_ERROR, "bind for input parameter failed" );
+		    ssa_error( aTHX_ sth, imp_dbh->conn, SQLE_ERROR, "bind for input parameter failed" );
 		    return( FALSE );
 		}
 	    }
@@ -864,8 +877,8 @@ really_bind( SV *sth, imp_sth_t *imp_sth )
 }
 
 static int
-assign_output_parameters( SV *sth, imp_sth_t *imp_sth )
-/*****************************************************/
+assign_output_parameters( pTHX_ SV *sth, imp_sth_t *imp_sth )
+/***********************************************************/
 {
     D_imp_dbh_from_sth;
     HE		*he;
@@ -885,13 +898,13 @@ assign_output_parameters( SV *sth, imp_sth_t *imp_sth )
 	if( phs->ordinal != 0 && phs->ordinal <= imp_sth->num_bind_params ) {
 	    a_sqlany_bind_param		desc;
 	    if( !sacapi->api.sqlany_describe_bind_param( imp_sth->statement, phs->ordinal-1, &desc ) ) {
-		ssa_error( sth, imp_dbh->conn, SQLE_ERROR, "failed to get description for bind param" );
+		ssa_error( aTHX_ sth, imp_dbh->conn, SQLE_ERROR, "failed to get description for bind param" );
 		return( FALSE );
 	    }
 	    if( phs->is_inout && (desc.direction&DD_OUTPUT) ) {
 		a_sqlany_bind_param_info	bp;
 		if( !sacapi->api.sqlany_get_bind_param_info( imp_sth->statement, phs->ordinal-1, &bp ) ) {
-		    ssa_error( sth, imp_dbh->conn, SQLE_ERROR, "failed to get bind param info" );
+		    ssa_error( aTHX_ sth, imp_dbh->conn, SQLE_ERROR, "failed to get bind param info" );
 		    return( FALSE );
 		}
 		if( phs->out_param_is_null ) {
@@ -918,6 +931,7 @@ dbd_st_execute( SV *sth, imp_sth_t *imp_sth )
 // return value <= -2:error, >=0:ok row count, (-1=unknown count) */
 {
     dTHR;
+    dTHX;
     D_imp_dbh_from_sth;
     int			do_commit = FALSE;
     int			sqlcode;
@@ -928,7 +942,7 @@ dbd_st_execute( SV *sth, imp_sth_t *imp_sth )
     // one on the same handle.
     dbd_st_finish( sth, imp_sth );
     
-    if( !really_bind( sth, imp_sth ) ) {
+    if( !really_bind( aTHX_ sth, imp_sth ) ) {
 	return( -2 );
     }
 
@@ -939,7 +953,7 @@ dbd_st_execute( SV *sth, imp_sth_t *imp_sth )
     // A failure to execute or there is no cursor open
     if( sqlcode == SQLE_NOTFOUND ) {
 	// num_cols == 0 implies it was execute-only (and no cursor)
-	if( num_cols == 0 && !assign_output_parameters( sth, imp_sth ) ) {
+	if( num_cols == 0 && !assign_output_parameters( aTHX_ sth, imp_sth ) ) {
 	    return( -2 );
 	}
 	sv_setpv( DBIc_ERR(imp_sth), "" );
@@ -949,7 +963,7 @@ dbd_st_execute( SV *sth, imp_sth_t *imp_sth )
     // This error case for SQLE_TRUNCATED as well because there is no
     // way to call GET DATA without a cursor.
     if( sqlcode < 0 ) {
-	ssa_error( sth, imp_dbh->conn, SQLE_ERROR, "execute failed" );
+	ssa_error( aTHX_ sth, imp_dbh->conn, SQLE_ERROR, "execute failed" );
 	if( DBIS->debug >= 3 ) {
 	    PerlIO_printf( DBILOGFP, "    dbd_st_execute failed, rc=%d", sqlcode );
 	}
@@ -959,7 +973,7 @@ dbd_st_execute( SV *sth, imp_sth_t *imp_sth )
 
     if( sqlcode > 0 ) {
 	// Just a warning
-	ssa_error( sth, imp_dbh->conn, SQLE_ERROR, "warning during execute" );
+	ssa_error( aTHX_ sth, imp_dbh->conn, SQLE_ERROR, "warning during execute" );
 	if( DBIS->debug >= 3 ) {
 	    PerlIO_printf( DBILOGFP, "    dbd_st_execute warning, rc=%d", sqlcode );
 	}
@@ -967,7 +981,7 @@ dbd_st_execute( SV *sth, imp_sth_t *imp_sth )
 
     if( num_cols == 0 ) {
 	// executed already & no cursor
-	if( !assign_output_parameters( sth, imp_sth ) ) {
+	if( !assign_output_parameters( aTHX_ sth, imp_sth ) ) {
 	    return( -2 );
 	}
 	imp_sth->row_count = sacapi->api.sqlany_affected_rows( imp_sth->statement );
@@ -993,6 +1007,7 @@ AV *
 dbd_st_fetch( SV *sth, imp_sth_t *imp_sth )
 /*****************************************/
 {
+    dTHX;
     D_imp_dbh_from_sth;
     int 			debug = DBIS->debug;
     int 			num_fields;
@@ -1003,7 +1018,7 @@ dbd_st_fetch( SV *sth, imp_sth_t *imp_sth )
 
     /* Check that execute() was executed sucessfuly. */
     if( !DBIc_ACTIVE(imp_sth) ) {
-	ssa_error( sth, NULL, SQLE_CURSOR_NOT_OPEN, "no statement executing" );
+	ssa_error( aTHX_ sth, NULL, SQLE_CURSOR_NOT_OPEN, "no statement executing" );
 	return( Nullav );
     }
 
@@ -1018,7 +1033,7 @@ dbd_st_fetch( SV *sth, imp_sth_t *imp_sth )
 	sv_setpv( DBIc_ERR(imp_sth), "" );	/* just end-of-fetch	*/
 	return( Nullav );
     } else if( sqlcode < 0 ) {
-	ssa_error( sth, imp_dbh->conn, SQLE_ERROR, "fetch failed" );
+	ssa_error( aTHX_ sth, imp_dbh->conn, SQLE_ERROR, "fetch failed" );
 	if( debug >= 3 ) {
 	    PerlIO_printf( DBILOGFP, "    dbd_st_fetch failed, rc=%d", sqlcode );
 	}
@@ -1028,7 +1043,7 @@ dbd_st_fetch( SV *sth, imp_sth_t *imp_sth )
 
     if( sqlcode > 0 ) {
 	// Just a warning
-	ssa_error( sth, imp_dbh->conn, SQLE_ERROR, "warning during fetch" );
+	ssa_error( aTHX_ sth, imp_dbh->conn, SQLE_ERROR, "warning during fetch" );
 	if( DBIS->debug >= 3 ) {
 	    PerlIO_printf( DBILOGFP, "    dbd_st_fetch warning, rc=%d", sqlcode );
 	}
@@ -1045,7 +1060,7 @@ dbd_st_fetch( SV *sth, imp_sth_t *imp_sth )
     for( i=0; i < num_fields; ++i ) {
 	SV 		*sv = AvARRAY(av)[i]; /* Note: we (re)use the SV in the AV	*/
 
-	if( !assign_from_result_set( sth, imp_sth, sv, i ) ) {
+	if( !assign_from_result_set( aTHX_ sth, imp_sth, sv, i ) ) {
 	    return( Nullav );
 	}
     }
@@ -1058,6 +1073,7 @@ dbd_st_blob_read( SV *sth, imp_sth_t *imp_sth,
 		  int field, long offset, long len, SV *destrv, long destoffset )
 /*******************************************************************************/
 {
+    dTHX;
     D_imp_dbh_from_sth;
     SV			*bufsv;
     a_sqlany_data_info	dinfo;
@@ -1072,7 +1088,7 @@ dbd_st_blob_read( SV *sth, imp_sth_t *imp_sth,
 	if( DBIS->debug >= 3 ) {
 	    PerlIO_printf( DBILOGFP, "blob_read on inactive handle\n" );
 	}
-	ssa_error( sth, NULL, SQLE_CURSOR_NOT_OPEN, "no statement executing" );
+	ssa_error( aTHX_ sth, NULL, SQLE_CURSOR_NOT_OPEN, "no statement executing" );
 	return( 0 );
     }
 
@@ -1091,7 +1107,7 @@ dbd_st_blob_read( SV *sth, imp_sth_t *imp_sth,
     }
 
     if( !sacapi->api.sqlany_get_data_info( imp_sth->statement, field, &dinfo ) ) {
-	ssa_error( sth, imp_dbh->conn, SQLE_ERROR, "get_data_info failed" );
+	ssa_error( aTHX_ sth, imp_dbh->conn, SQLE_ERROR, "get_data_info failed" );
 	return( 0 );
     }
 
@@ -1099,7 +1115,7 @@ dbd_st_blob_read( SV *sth, imp_sth_t *imp_sth,
 	if( DBIS->debug >= 3 ) {
 	    PerlIO_printf( DBILOGFP, "blob_read: field is neither string nor binary\n" );
 	}
-	ssa_error( sth, imp_dbh->conn, SQLE_ERROR, "blob_read: field is neither string nor binary\n" ); 
+	ssa_error( aTHX_ sth, imp_dbh->conn, SQLE_ERROR, "blob_read: field is neither string nor binary\n" ); 
 	return( 0 );
     }
 
@@ -1115,7 +1131,7 @@ dbd_st_blob_read( SV *sth, imp_sth_t *imp_sth,
     
     retlen = sacapi->api.sqlany_get_data( imp_sth->statement, field, offset, dest, len );
     if( retlen < 0 ) {
-	ssa_error( sth, imp_dbh->conn, SQLE_ERROR, "get_data failed" );
+	ssa_error( aTHX_ sth, imp_dbh->conn, SQLE_ERROR, "get_data failed" );
 	return( 0 );
     }
 
@@ -1148,6 +1164,7 @@ dbd_st_finish( SV *sth, imp_sth_t *imp_sth )
 /******************************************/
 {
     dTHR;
+    dTHX;
     D_imp_dbh_from_sth;
     SACAPI		*sacapi = imp_dbh->sacapi;
 
@@ -1166,8 +1183,8 @@ dbd_st_finish( SV *sth, imp_sth_t *imp_sth )
 }
 
 void
-release_bind_params( SV *sth, imp_sth_t *imp_sth )
-/************************************************/
+release_bind_params( pTHX_ SV *sth, imp_sth_t *imp_sth )
+/******************************************************/
 {
     D_imp_dbh_from_sth;
     HE		*he;
@@ -1187,6 +1204,8 @@ release_bind_params( SV *sth, imp_sth_t *imp_sth )
 	    SvREFCNT_dec( phs->sv );
 	}
     }
+    sv_free( (SV *)hv );
+    imp_sth->bind_names = NULL;
 }
 
 void
@@ -1200,10 +1219,11 @@ dbd_st_destroy( SV *sth, imp_sth_t *imp_sth )
 
     if( DBIc_ACTIVE(imp_dbh) ) {
 	if( imp_sth->statement ) {
+	    dTHX;
 	    sacapi->api.sqlany_free_stmt( imp_sth->statement );
 	    imp_sth->statement = NULL;
 	    
-	    release_bind_params( sth, imp_sth );
+	    release_bind_params( aTHX_ sth, imp_sth );
 	    Safefree( imp_sth->sql_statement );
 	    imp_sth->sql_statement = NULL;
 	}
@@ -1272,6 +1292,7 @@ SV *
 dbd_st_FETCH_attrib( SV *sth, imp_sth_t *imp_sth, SV *keysv )
 /***********************************************************/
 {
+    dTHX;
     D_imp_dbh_from_sth;
     STRLEN 			kl;
     char 			*key = SvPV(keysv,kl);

@@ -30,7 +30,7 @@ use warnings;
     use DynaLoader ();
     use Exporter ();
 
-    our $VERSION = '2.05';
+    our $VERSION = '2.06';
     our @ISA = qw(DynaLoader Exporter);
     our %EXPORT_TAGS = (
 	asa_types => [ qw(
@@ -44,7 +44,7 @@ use warnings;
 
     my $Revision = substr(q$Revision: 1.57 $, 10);
 
-    require_version DBI 1.02;
+    require_version DBI 1.51;
 
     bootstrap DBD::SQLAnywhere $VERSION;
 

@@ -126,7 +126,7 @@ struct phs_st {	/* scalar placeholder EXPERIMENTAL	*/
     size_t		out_param_length;
 };
 
-void ssa_error( SV *h, a_sqlany_connection *sqlca, int sqlcode, char *what );
+void ssa_error( pTHX_ SV *h, a_sqlany_connection *sqlca, int sqlcode, char *what );
 
 #define dbd_init		sqlanywhere_init
 #define dbd_dr_init		sqlanywhere_dr_init
