@@ -6,102 +6,84 @@
 
 use lib 'blib/lib';
 use lib 'blib/arch';
-
-BEGIN {print "1..11\n";}
-END {print "not ok 1\n" unless $loaded;}
+use strict;
 use DBI;
-$loaded = 1;
-print "ok 1\n";
+use Test::More;
 
-my($switch) = DBI->internal;
+my $switch = DBI->internal;
 #DBI->trace(2); # 2=detailed handle trace
+note( "Switch: $switch->{'Attribution'}, $switch->{'Version'}\n" );
+note( "Available Drivers: ",join(", ",DBI->available_drivers()),"\n" );
 
-print "Switch: $switch->{'Attribution'}, $switch->{'Version'}\n";
+my $dbh;
+eval {
+    $dbh = DBI->connect("DBI:SQLAnywhere:UID=dba;PWD=sql;ENG=demo;DBF=demo.db", '', '', {PrintError => 0});
+};
+if( $@ ) {
+    plan( skip_all => 'SQL Anywhere dbcapi library is not installed' );
+    exit( 0 );
+}
+if( !$dbh ) {
+    plan( skip_all => 'demo.db is not accessible' );
+    exit( 0 );
+}
 
-print "Available Drivers: ",join(", ",DBI->available_drivers()),"\n";
+plan( tests => 10 );
 
-my $dbh = DBI->connect("DBI:SQLAnywhere:UID=dba;PWD=sql;ENG=demo;DBF=demo.db", '', '', {PrintError => 0});
-
-die "Unable to connect to demo: $DBI::errstr"
-    unless $dbh;
+ok( $dbh, 'connect' );
 
 my $sth;
 
-($sth = $dbh->prepare("select * from sysusers"))
-    and print "ok 2\n"
-    or print "not ok 2\n";
-if($sth->execute) {
-    print "ok 3\n";
-    print "Fields: $sth->{NUM_OF_FIELDS}\n";
-    print "Names: @{$sth->{NAME}}\n";
-    #print "Null:  @{$sth->{NULLABLE}}\n";
-    my $rows = 0;
-    while(@dat = $sth->fetchrow) {
-	++$rows;
-	foreach (@dat) {
-	    $_ = '' unless $_;
-	}
-	print "@dat\n";
-    }
-    ($rows == $sth->rows || $sth->rows < 0 )
-	and print "ok 4\n"
-	    or print "not ok 4\n";
-#    $sth->finish;
-}
-else {
-    print STDERR ($DBI::err, ":\n", $sth->errstr);
-    print "not ok 3\nnot ok 4\n";
-}
-undef $sth;
-($sth = $dbh->prepare("select * from sys_users"))
-    and print "not ok 5\n"
-    or print "ok 5\n";
+$sth = $dbh->prepare( "select * from sysusers" );
+ok( $sth, 'prepare' );
+ok( $sth->execute() );
 
-if( defined( $sth ) ) {
-    print "not ok 6\n";		# SHOULD FAIL!!!
-} else {
-    print "ok 6\n";
-    ($DBI::err == -141)
-	and print "ok 7\n"
-	    or print "not ok 7\n";
-#    print STDERR ($DBI::err, ":\n", $sth->errstr);
-}
-($sth = $dbh->prepare("select * from sysusers"))
-    and print "ok 8\n"
-    or print "not ok 8\n";
-if($sth->execute) {
-    print "ok 9\n";
-    my @fields = @{$sth->{NAME}};
-    my $rows = 0;
-    my $d;
-    my $ok = 1;
-    while($d = $sth->fetchrow_hashref) {
-	++$rows;
-	foreach (@fields) {
-	    if(!exists($d->{$_})) {
-		$ok = 0;
-	    }
-	    my $t = $d->{$_} || '';
-	    print "$t ";
-	}
-	print "\n";
+my @dat;
+note( "Fields: $sth->{NUM_OF_FIELDS}\n" );
+note( "Names: @{$sth->{NAME}}\n" );
+#note( "Null:  @{$sth->{NULLABLE}}\n" );
+my $rows = 0;
+while(@dat = $sth->fetchrow) {
+    ++$rows;
+    foreach (@dat) {
+	$_ = '' unless $_;
     }
-    $ok and print "ok 10\n"
-	or print "not ok 10\n";
-    ($rows == $sth->rows || $sth->rows < 0)
-	and print "ok 11\n"
-	    or print "not ok 11\n";
-#    $sth->finish;
+    note( "@dat\n" );
 }
-else {
-    print STDERR ($DBI::err, ":\n", $sth->errstr);
-    print "not ok 9\nnot ok 10\nnot ok 11";
-}
-
+ok( ($rows == $sth->rows || $sth->rows < 0 ), 'rowcount' );
 undef $sth;
 
-$dbh->{LongReadLen} = 32000;
 
-$dbh->disconnect;
+$sth = $dbh->prepare( "select * from sys_users" );
+ok( !$sth, 'prepare' );
+ok( $DBI::err == -141, 'expected error code' );
+
+$sth = $dbh->prepare( "select * from sysusers" );
+ok( $sth, 'prepare' );
+ok( $sth->execute(), 'execute' );
+
+my @fields = @{$sth->{NAME}};
+$rows = 0;
+my $d;
+my $ok = 1;
+
+while( $d = $sth->fetchrow_hashref() ) {
+    ++$rows;
+    my $rstr = '';
+    foreach ( @fields ) {
+	if( !exists( $d->{$_} ) ) {
+	    $ok = 0;
+	}
+	my $t = $d->{$_} || '';
+	$rstr = $rstr . "$t ";
+    }
+    note( $rstr );
+}
+ok( $ok, 'reference fields by name' );
+ok( ($rows == $sth->rows || $sth->rows < 0), 'rowcount' );
+#    $sth->finish;
+undef $sth;
+
+$dbh->disconnect();
 
 

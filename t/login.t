@@ -4,29 +4,29 @@
 
 use lib 'blib/lib';
 use lib 'blib/arch';
-
-BEGIN {print "1..3\n";}
-END {print "not ok 1\n" unless $loaded;}
+use strict;
 use DBI;
-$loaded = 1;
-print "ok 1\n";
+use Test::More;
 
-# Test for a good connect
+my $dbh;
+eval {
+    $dbh = DBI->connect( "DBI:SQLAnywhere:UID=dba;PWD=sql;ENG=demo;DBF=demo.db", '', '', {PrintError => 0});
+};
+if( $@ ) {
+    plan( skip_all => 'SQL Anywhere dbcapi library is not installed' );
+    exit( 0 );
+}
+if( !$dbh ) {
+    plan( skip_all => 'demo.db is not accessible' );
+    exit( 0 );
+}
 
-my $dbh = DBI->connect("DBI:SQLAnywhere:UID=dba;PWD=sql;ENG=demo;DBF=demo.db", '', '', {PrintError => 0});
-
-$dbh and print "ok 2\n"
-    or print "not ok 2\n";
-
-$dbh->disconnect if $dbh;
+plan( tests => 2 );
+ok( $dbh, 'connect' );
+$dbh->disconnect();
 
 # Test for a bad connect
-
 $dbh = DBI->connect("DBI:SQLAnywhere:UID=dba;PWD=xxx;ENG=demo;DBF=demo.db", '', '', {PrintError => 0});
-
-$dbh and print "not ok 3\n"
-    or print "ok 3\n";
-
-$dbh->disconnect if $dbh;
+ok( !$dbh, 'incorrect_password' );
 
 exit(0);

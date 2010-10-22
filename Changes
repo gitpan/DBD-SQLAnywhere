@@ -1,6 +1,13 @@
-Changes in DBD::SQLAnywhere 2.06 20th October 2010
+Changes in DBD::SQLAnywhere 2.07 22nd October 2010
+  Somehow, the v2.06 package that I uploaded to PAUSE contained the old tests.
+    I'm just going to try again but that requires a new version number.
+  I also added a dependency on Test::Simple (which contains Test::More)
+
+Changes in DBD::SQLAnywhere 2.06 21st October 2010
   Removed leak of bind_names hv for hostvars
   Added PERL_NO_GET_CONTEXT for efficiency on threaded perl.
+  Changed tests to pass/skip if SQL Anywhere is not installed or demo.db
+    is not accessible.
 
 Changes in DBD::SQLAnywhere 2.05 19th October 2010
   Fixed resource cleanup on failed connect

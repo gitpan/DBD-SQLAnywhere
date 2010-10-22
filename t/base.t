@@ -4,22 +4,43 @@
 
 # Base DBD Driver Test
 
-print "1..$tests\n";
+use strict;
+use Test::More tests => 5;
 
-require DBI;
-print "ok 1\n";
+note( 'Test loading DBI, DBD::SQLAnywhere and version' );
+require_ok( 'DBI' );
 
-import DBI;
-print "ok 2\n";
+eval {
+    import DBI;
+};
+ok( !$@, 'import DBI' );
 
-$switch = DBI->internal;
-(ref $switch eq 'DBI::dr') ? print "ok 3\n" : print "not ok 3\n";
+my $switch = DBI->internal;
+is( ref( $switch ), 'DBI::dr', 'internal' );
 
-$drh = DBI->install_driver('SQLAnywhere');
-(ref $drh eq 'DBI::dr') ? print "ok 4\n" : print "not ok 4\n";
+my $drh;
+eval {
+    $drh = DBI->install_driver( 'SQLAnywhere' );
+};
+my $ev = $@;
+if( $ev ) {
+    $ev =~ s/\n\n+/\n/g;
+    warn "\n\n\n";
+    warn "Note:\n";
+    warn "\n";
+    warn "Failed to load the DBD::SQLAnywhere driver or the SQL Anywhere client\n";
+    warn "libraries. Ensure that SQLAnywhere has been installed and configured\n";
+    warn "correctly and that demo.db has been started. Attempting to load\n";
+    warn "DBD::SQLAnywhere reported the following error:\n";
+    warn "    $ev\n";
+    warn "The remaining tests will be skipped.\n\n";
+    sleep( 5 );
+}
 
-print "ok 5\n" if $drh->{Version};
+SKIP: {
+    skip( 'install_driver failed -- skipping remaining', 2 ) if $ev;
 
-BEGIN { $tests = 5 }
-exit 0;
+    is( ref( $drh ), 'DBI::dr', 'install_driver' );
+    ok( $drh->{Version}, 'version' );
+}
 # end.
