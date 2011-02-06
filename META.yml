@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               DBD-SQLAnywhere
-version:            2.07
+version:            2.08
 abstract:           SQL Anywhere DBD driver
 author:
     - John Smirnios (smirnios@sybase.com), Tim Bunce

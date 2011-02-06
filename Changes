@@ -1,3 +1,11 @@
+Changes in DBD::SQLAnywhere 2.08 23rd November 2010, 10th January 2011
+  Prepare for removal of PERL_POLLUTE support.
+  Moved usage documentation into SQLAnywhere.pm as POD documentation. README
+    only contains information for building. CPAN search "all" function actually
+    only looks at the POD documentation.
+  table_info, etc now use SYSUSER rather than SYSUSERPERM. SYSUSERPERM was
+    deprecated in v10 and can only be read by DBA.
+
 Changes in DBD::SQLAnywhere 2.07 22nd October 2010
   Somehow, the v2.06 package that I uploaded to PAUSE contained the old tests.
     I'm just going to try again but that requires a new version number.

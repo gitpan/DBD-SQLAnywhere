@@ -30,7 +30,7 @@ use warnings;
     use DynaLoader ();
     use Exporter ();
 
-    our $VERSION = '2.07';
+    our $VERSION = '2.08';
     our @ISA = qw(DynaLoader Exporter);
     our %EXPORT_TAGS = (
 	asa_types => [ qw(
@@ -218,7 +218,7 @@ use warnings;
 		      endif)
 		endif) as TABLE_TYPE,
 	    t.remarks as REMARKS
-	from SYS.SYSTABLE t, SYS.SYSUSERPERM u
+	from SYS.SYSTABLE t, SYS.SYSUSER u
 	where t.creator = u.user_id
 	  and u.user_name  like ?
  	  and t.table_name like ?
@@ -381,7 +381,7 @@ use warnings;
 	    NULL AS DTD_IDENTIFIER,
 	    NULL AS IS_SELF_REF
 	    from SYS.SYSTABLE t
-	   , SYS.SYSUSERPERM u
+	   , SYS.SYSUSER u
 	   , SYS.SYSCOLUMN c
 	   , SYS.SYSDOMAIN d
 	where t.creator     = u.user_id
@@ -424,7 +424,7 @@ use warnings;
 	    c.column_id AS KEY_SEQ,
 	    i.index_name as PK_NAME
 	from SYS.SYSTABLE t
-       , SYS.SYSUSERPERM u
+       , SYS.SYSUSER u
        , SYS.SYSCOLUMN c
        , SYS.SYSIDX i
 	where t.creator     = u.user_id
@@ -488,7 +488,7 @@ use warnings;
 	    NULL as PAGES,
 	    NULL as FILTER_CONDITION
 	from SYS.SYSTABLE t
-	, SYS.SYSUSERPERM u
+	, SYS.SYSUSER u
 	, SYS.SYSIDX i
 	where t.creator  = u.user_id
 	  and t.table_id = i.table_id
@@ -529,3 +529,102 @@ use warnings;
 
 __END__
 
+=head1 NAME
+
+DBD::SQLAnywhere - SQLAnywhere database driver for DBI
+
+=head1 SYNOPSIS
+
+  use DBI;
+
+  $dbh = DBI->connect( "dbi:SQLAnywhere:ENG=demo;UID=$userid;PWD=$passwd", '', '' );
+
+  $dbh = DBI->connect( 'dbi:SQLAnywhere:ENG=demo', $userid, $passwd );
+
+  # Use 'perldoc DBI' for detailed information about DBI.
+
+=head1 DESCRIPTION
+
+DBD::SQLAnywhere is a Perl database driver (DBD) module that works
+with the L<DBI> module to provide access to Sybase SQL Anywhere
+databases.
+
+=head2 Connecting to SQL Anywhere
+
+If you are not already familiar with SQL Anywhere connection
+parameters, please refer to the SQL Anywhere documentation.
+
+SQL Anywhere connection parameters can be passed to DBD::SQLAnywhere
+by placing the list of parameters after 'dbi:SQLAnywhere:' in the
+first parameter to connect(). The connection parameters are specified
+as a list of LABEL=value pairs that are delimited by semicolons.
+
+Example:
+
+    $dbh = DBI->connect( 'dbi:SQLAnywhere:ENG=demo;UID=dba;PWD=sql', '', '' );
+
+If the second argument to connect() is nonblank, it is assumed to be a
+user name and UID=argument2 will be appended to the SQL Anywhere
+connection string.
+
+Similarly, if the third argument is nonblank, it is assumed to be a
+password and PWD=argument3 will be appended to the SQL Anywhere
+connection string.
+
+The following is equivalent to the example above:
+
+    $dbh = DBI->connect( 'dbi:SQLAnywhere:ENG=demo', 'dba', 'sql' );
+
+=head2 Prepared Statement and Cursor Limits
+
+To help detect handle leaks in client applications, SQL Anywhere
+defaults to limiting the number of prepared statements and open
+cursors that any connection can hold at one time to 50 of each. If
+that limit is exceeded, a "Resource governor ... exceeded" error is
+reported. If you encounter this error, make sure you are dropping all
+of your statement handles and, if so, consult the SQL Anywhere
+documentation for the MAX_CURSOR_COUNT and MAX_STATEMENT_COUNT
+options.
+
+Note that prepared statements are not dropped from the SQL Anywhere
+server until the statement handle is destroyed in the perl
+script. Calling finish() is not sufficient to drop the handle that the
+server is holding onto: use "undef" instead or reuse the same perl
+variable for another handle.
+
+Be careful when using prepare_cached() since the cache will
+hold onto statement handles.
+
+=head1 REQUIREMENTS
+
+As of version 2.0, DBD::SQLAnywhere can be built (but not used)
+without SQL Anywhere installed. To use DBD::SQLAnywhere, an
+installation of the SQL Anywhere client software is required and must
+include the "dbcapi" component (dbcapi.dll on Windows and
+libdbcapi.so/libdbcapi_r.so on UNIX). Dbcapi is included in the client
+installation of SQL Anywhere 11.0.0 and later. To use SQL Anywhere
+version 10.0.0 or 10.0.1 with this DBD driver, download and
+install a current EBF for your version of SQL Anywhere from
+www.sybase.com.
+
+=head1 DEPENDENCIES
+
+L<DBI>
+
+L<Test::Simple>
+
+=head1 AUTHOR
+
+John Smirnios (smirnios@sybase.com).
+
+Based on a driver written by Tim Bunce.
+
+=head1 COPYRIGHT
+
+Portions Copyright (c) 1994,1995,1996           Tim Bunce
+Portions Copyright (c) 1996-2010		iAnywhere Solutions, Inc.
+
+For license information, please see license.txt included in this
+distribution.
+
+=cut

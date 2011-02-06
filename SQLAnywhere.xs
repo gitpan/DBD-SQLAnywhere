@@ -83,7 +83,7 @@ void
 driver_init( drh )
     SV 	     *drh
     CODE:
-    ST(0) = (dbd_dr_init( drh ) ? &sv_yes : &sv_no);
+    ST(0) = (dbd_dr_init( drh ) ? &PL_sv_yes : &PL_sv_no);
     
 void
 DESTROY( drh )

@@ -185,7 +185,7 @@ dbd_discon_all( SV *drh, imp_drh_t *imp_drh )
     dTHX;
 
     /* The disconnect_all concept is flawed and needs more work */
-    if( !dirty && !SvTRUE(perl_get_sv("DBI::PERL_ENDING",0)) ) {
+    if( !PL_dirty && !SvTRUE(perl_get_sv("DBI::PERL_ENDING",0)) ) {
 	sv_setiv( DBIc_ERR(imp_drh), (IV)1 );
 	sv_setpv( DBIc_ERRSTR(imp_drh),
 		  (char *)"disconnect_all not implemented");
@@ -193,8 +193,8 @@ dbd_discon_all( SV *drh, imp_drh_t *imp_drh )
 		     DBIc_ERR(imp_drh), DBIc_ERRSTR(imp_drh) );
 	return( FALSE );
     }
-    if( perl_destruct_level ) {
-	perl_destruct_level = 0;
+    if( PL_perl_destruct_level ) {
+	PL_perl_destruct_level = 0;
     }
     return( FALSE );
 }
@@ -248,7 +248,7 @@ ssa_error( pTHX_ SV *h, a_sqlany_connection *conn, int sqlcode, char *what )
     DBIh_EVENT2( h, ERROR_event, DBIc_ERR(imp_xxh), errstr );
     if( DBIS->debug >= 2 ) {
 	PerlIO_printf( DBILOGFP, "%s error %d recorded: %s\n",
-		       what, sqlcode, SvPV(errstr,na) );
+		       what, sqlcode, SvPV(errstr,PL_na) );
     }
 }
 
@@ -434,7 +434,7 @@ dbd_db_STORE_attrib( SV *dbh, imp_dbh_t *imp_dbh, SV *keysv, SV *valuesv )
 	if( was_off && on ) {
 	    sacapi->api.sqlany_commit( imp_dbh->conn );
 	}
-	cachesv = (on) ? &sv_yes : &sv_no;	/* cache new state */
+	cachesv = (on) ? &PL_sv_yes : &PL_sv_no;	/* cache new state */
 	DBIc_set( imp_dbh, DBIcf_AutoCommit, on );
     } else {
 	return FALSE;
@@ -590,7 +590,7 @@ dbd_preparse( imp_sth_t *imp_sth, char *statement )
 	    imp_sth->bind_names = newHV();
 	}
 	phs_tpl.ordinal = curr_ordinal;
-	phs_tpl.sv = &sv_undef;
+	phs_tpl.sv = &PL_sv_undef;
 	phs_sv = newSVpv( (char*)&phs_tpl, sizeof(phs_tpl) );
 	if( ph_name == NULL ) {
 	    ph_name = _ph_name_buf;
@@ -660,7 +660,7 @@ dbd_bind_ph( SV		*sth,
 	    PerlIO_printf( DBILOGFP, ", inout 0x%p", newvalue );
 	}
 	if( attribs ) {
-	    PerlIO_printf( DBILOGFP, ", attribs: %s", SvPV(attribs,na) );
+	    PerlIO_printf( DBILOGFP, ", attribs: %s", SvPV(attribs,PL_na) );
 	}
 	PerlIO_printf( DBILOGFP, ")\n" );
     }
@@ -671,7 +671,7 @@ dbd_bind_ph( SV		*sth,
     }
 
     if( is_inout && SvREADONLY( newvalue ) ) {
-	croak( no_modify );
+	croak( PL_no_modify );
     }
 
     phs = (phs_t *)((void*)SvPVX(*svp));		/* placeholder struct	*/
@@ -679,7 +679,7 @@ dbd_bind_ph( SV		*sth,
 	croak( "bind_param internal error: unknown ordinal for '%s'\n", name );
     }
 
-    if( phs->sv != &sv_undef ) {	 /* first bind for this placeholder	*/
+    if( phs->sv != &PL_sv_undef ) {	 /* first bind for this placeholder	*/
 	SvREFCNT_dec( phs->sv );
     }
     
@@ -789,7 +789,7 @@ assign_from_result_set( pTHX_ SV *sth, imp_sth_t *imp_sth, SV *sv, int index )
 
     if( DBIS->debug >= 3 ) {
 	PerlIO_printf( DBILOGFP, "        %d: '%s'\n",
-		       index, SvOK(sv) ? SvPV(sv,na) : "NULL" );
+		       index, SvOK(sv) ? SvPV(sv,PL_na) : "NULL" );
     }
     return( TRUE );
 }
@@ -830,7 +830,7 @@ really_bind( pTHX_ SV *sth, imp_sth_t *imp_sth )
 
 	    if( phs->is_inout && (desc.direction&DD_OUTPUT) ) {
 		a_sqlany_bind_param	bp = desc;
-		SV	*lcl_undef = &sv_undef;
+		SV	*lcl_undef = &PL_sv_undef;
 		char	*lcl_p = NULL;
 		bp.direction = DD_OUTPUT;
 		bp.value.type = bind_type;
@@ -862,7 +862,7 @@ really_bind( pTHX_ SV *sth, imp_sth_t *imp_sth )
 		    phs->in_param_length = 0;
 		    phs->in_param_is_null = TRUE;
 		} else {
-		    bp.value.buffer = SvPV( phs->sv, na );
+		    bp.value.buffer = SvPV( phs->sv, PL_na );
 		    phs->in_param_length = bp.value.buffer_size = SvCUR( phs->sv );
 		    phs->in_param_is_null = FALSE;
 		}
@@ -1200,7 +1200,7 @@ release_bind_params( pTHX_ SV *sth, imp_sth_t *imp_sth )
     while( (he=hv_iternext( hv )) != NULL ) {
 	sv = hv_iterval( hv, he );
 	phs = (phs_t *)((void *)SvPVX(sv));		/* placeholder struct	*/
-	if( phs->sv != &sv_undef ) {
+	if( phs->sv != &PL_sv_undef ) {
 	    SvREFCNT_dec( phs->sv );
 	}
     }
@@ -1401,11 +1401,11 @@ dbd_st_FETCH_attrib( SV *sth, imp_sth_t *imp_sth, SV *keysv )
 	    av_store( av, i, boolSV( cinfo.nullable ) );
 	}
     } else if( kl == 10 && strEQ( key, "CursorName" ) ) {
-	retsv = &sv_undef;
+	retsv = &PL_sv_undef;
     } else if( kl == 9 && strEQ( key, "Statement" ) ) {
 	retsv = newSVpv( (char *)imp_sth->sql_statement, 0 );
     } else if( kl == 11 && strEQ( key, "RowsInCache" ) ) {
-	retsv = &sv_undef;
+	retsv = &PL_sv_undef;
     } else {
 	return( Nullsv );
     }
